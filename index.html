@@ -706,6 +706,22 @@ input,button,textarea { font-family: inherit; }
 }
 .toast.show { transform: translateX(-50%) translateY(0); }
 
+/* ── Calendar tasks ─────────────────── */
+.cal-task { position:absolute; left:2px; right:2px; border-radius:6px; padding:3px 4px; overflow:hidden; display:flex; flex-direction:column; gap:1px; }
+.cal-task.t-done { opacity:.4; }
+.cal-task-row { display:flex; align-items:center; gap:2px; }
+.cal-task-name { font-size:.68rem; font-weight:700; color:#fff; flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.cal-task-done { flex-shrink:0; width:14px; height:14px; border-radius:50%; border:1.5px solid rgba(255,255,255,.7); background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:.5rem; color:#fff; }
+.cal-task.t-done .cal-task-done { background:rgba(255,255,255,.6); }
+.cal-task-del { flex-shrink:0; background:none; border:none; color:rgba(255,255,255,.55); font-size:.72rem; cursor:pointer; padding:0 1px; line-height:1; }
+.cal-task-time { font-size:.58rem; color:rgba(255,255,255,.75); }
+.cal-add-task-btn { display:flex; align-items:center; justify-content:center; gap:5px; width:100%; background:rgba(124,111,247,.08); border:1px dashed rgba(124,111,247,.35); border-radius:12px; color:var(--accent); font-size:.84rem; font-weight:700; padding:10px; cursor:pointer; margin-bottom:10px; min-height:40px; transition:background .12s; }
+.cal-add-task-btn:active { background:rgba(124,111,247,.18); }
+.task-day-row { display:flex; gap:4px; margin-bottom:4px; }
+.task-day-chip { flex:1; background:var(--bg); border:1px solid var(--bd); border-radius:9px; color:var(--muted); font-size:.7rem; font-weight:700; padding:5px 2px; cursor:pointer; text-align:center; }
+.task-day-chip.sel { background:var(--accent); border-color:var(--accent); color:#fff; }
+.task-day-chip.is-today:not(.sel) { border-color:var(--accent); color:var(--accent); }
+
 /* ── Calendar week view ─────────────── */
 .cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
 .cal-nav-label { font-size:.9rem; font-weight:800; }
@@ -831,6 +847,7 @@ input,button,textarea { font-family: inherit; }
       <div class="cal-nav-label" id="calLabel"></div>
       <button class="cal-nav-btn" id="calNext">次週 ›</button>
     </div>
+    <button class="cal-add-task-btn" id="calAddTask">＋ タスクを追加</button>
   </div>
   <div class="cal-head-row" id="calHead"></div>
   <div class="cal-body-wrap" id="calBodyWrap">
@@ -899,6 +916,34 @@ input,button,textarea { font-family: inherit; }
   </div>
 </div>
 
+<!-- Modal: タスク追加 -->
+<div class="overlay" id="taskOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">📋 タスクを追加</div>
+    <div class="form-sec">
+      <span class="form-label">タイトル</span>
+      <input class="m-input" id="taskTitle" placeholder="タスク名を入力..." maxlength="40" style="margin-bottom:0">
+    </div>
+    <div class="form-sec">
+      <span class="form-label">日付</span>
+      <div class="task-day-row" id="taskDayRow"></div>
+    </div>
+    <div class="form-sec" style="margin-bottom:0">
+      <span class="form-label">時間</span>
+      <div class="sched-time-row">
+        <input type="time" id="taskStart" class="sched-time" value="09:00">
+        <span style="color:var(--muted);font-size:.82rem">〜</span>
+        <input type="time" id="taskEnd" class="sched-time" value="10:00">
+      </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn-cancel" id="closeTaskModal">キャンセル</button>
+      <button class="btn-save" id="saveTask">追加する →</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -930,6 +975,8 @@ if (!S.notes)      S.notes = [];
 if (!S.plan)       S.plan = {};
 if (!S.noteNextId) S.noteNextId = 1;
 if (!S.planNextId) S.planNextId = 1;
+if (!S.taskList)   S.taskList = [];
+if (!S.taskNextId) S.taskNextId = 1;
 
 function save() { localStorage.setItem('streakApp3', JSON.stringify(S)); syncSW(); }
 
@@ -1282,12 +1329,14 @@ document.querySelectorAll('.filter-chip').forEach(chip => {
 // ═══════════════════════════════════════
 // WEEK CALENDAR tab
 // ═══════════════════════════════════════
-const CAL_START  = 5;    // 5:00
-const CAL_END    = 23;   // 23:00
-const HOUR_H     = 60;   // px per hour
-const EVT_COLORS = ['#7c6ff7','#20d49a','#f59e0b','#ec4899','#60a5fa','#ff7043','#26c6da','#ab47bc'];
-const GCAL_DAY   = ['SU','MO','TU','WE','TH','FR','SA'];
+const CAL_START   = 5;
+const CAL_END     = 23;
+const HOUR_H      = 60;
+const EVT_COLORS  = ['#7c6ff7','#20d49a','#f59e0b','#ec4899','#60a5fa','#ff7043','#26c6da','#ab47bc'];
+const TASK_COLORS = ['#0f766e','#1d4ed8','#9333ea','#b45309','#be123c','#0369a1','#15803d','#c2410c'];
+const GCAL_DAY    = ['SU','MO','TU','WE','TH','FR','SA'];
 let calOffset = 0;
+let taskModalDay = today();
 
 function buildGCalUrl(habit) {
   const s = habit.schedule;
@@ -1334,12 +1383,14 @@ function renderCalendar() {
     head.appendChild(el);
   });
 
-  const anyScheduled = S.habits.some(h => h.schedule?.days?.length);
+  const weekKeys = new Set(week.map(d => localStr(d)));
+  const hasContent = S.habits.some(h => h.schedule?.days?.length)
+    || S.taskList.some(t => weekKeys.has(t.date));
   const hint = document.getElementById('calEmptyHint');
 
-  if (!anyScheduled) {
+  if (!hasContent) {
     hint.style.display = 'block';
-    hint.innerHTML = '📅 習慣にスケジュールを設定すると<br>ここに表示されます<br><br>「＋ 追加」で習慣を作成する際に<br>曜日と時間帯を設定してください';
+    hint.innerHTML = '📅 タスクを追加するか<br>習慣にスケジュールを設定すると<br>ここに表示されます';
     document.getElementById('calTimeGutter').innerHTML = '';
     document.getElementById('calTimeGutter').style.height = '0';
     document.getElementById('calDays').innerHTML = '';
@@ -1416,6 +1467,45 @@ function renderCalendar() {
     });
   });
 
+  // Tasks
+  S.taskList.forEach((task, idx) => {
+    const dayIdx = week.findIndex(d => localStr(d) === task.date);
+    if (dayIdx < 0) return;
+    const [sh2, sm2] = task.startTime.split(':').map(Number);
+    const [eh2, em2] = task.endTime.split(':').map(Number);
+    const startMin = sh2 * 60 + sm2;
+    const endMin   = eh2 * 60 + em2;
+    if (endMin <= startMin) return;
+    const topPx = (startMin - CAL_START * 60) / 60 * HOUR_H;
+    const htPx  = Math.max((endMin - startMin) / 60 * HOUR_H, 20);
+    const color  = TASK_COLORS[idx % TASK_COLORS.length];
+    const lane   = daysEl.children[dayIdx];
+    const evt    = document.createElement('div');
+    evt.className = 'cal-task' + (task.done ? ' t-done' : '');
+    evt.style.cssText = `top:${topPx}px;height:${htPx}px;background:${color};`;
+    evt.innerHTML = `
+      <div class="cal-task-row">
+        <div class="cal-task-name">📋 ${escHtml(task.title)}</div>
+        <button class="cal-task-done" title="完了">${task.done ? '✓' : ''}</button>
+        <button class="cal-task-del" title="削除">×</button>
+      </div>
+      ${htPx >= 32 ? `<div class="cal-task-time">${task.startTime}〜${task.endTime}</div>` : ''}
+    `;
+    evt.querySelector('.cal-task-done').addEventListener('click', e => {
+      e.stopPropagation();
+      task.done = !task.done;
+      save(); renderCalendar();
+    });
+    evt.querySelector('.cal-task-del').addEventListener('click', e => {
+      e.stopPropagation();
+      if (confirm(`「${task.title}」を削除しますか？`)) {
+        S.taskList = S.taskList.filter(t => t.id !== task.id);
+        save(); renderCalendar();
+      }
+    });
+    lane.appendChild(evt);
+  });
+
   // Current time line
   if (calOffset === 0) {
     const now = new Date();
@@ -1438,6 +1528,62 @@ function renderCalendar() {
 
 document.getElementById('calPrev').addEventListener('click', () => { calOffset--; renderCalendar(); });
 document.getElementById('calNext').addEventListener('click', () => { calOffset++; renderCalendar(); });
+
+function showTaskModal() {
+  const week = getWeekDates(calOffset);
+  const td = today();
+  taskModalDay = week.some(d => localStr(d) === td) ? td : localStr(week[0]);
+
+  const dayRow = document.getElementById('taskDayRow');
+  dayRow.innerHTML = '';
+  week.forEach((d, i) => {
+    const k = localStr(d);
+    const chip = document.createElement('button');
+    chip.className = 'task-day-chip' + (k === taskModalDay ? ' sel' : '') + (k === td ? ' is-today' : '');
+    chip.innerHTML = `<div>${WDAYS[i]}</div><div style="font-weight:900;font-size:.8rem">${d.getDate()}</div>`;
+    chip.addEventListener('click', () => {
+      taskModalDay = k;
+      dayRow.querySelectorAll('.task-day-chip').forEach(c => c.classList.remove('sel'));
+      chip.classList.add('sel');
+    });
+    dayRow.appendChild(chip);
+  });
+
+  document.getElementById('taskTitle').value = '';
+  document.getElementById('taskStart').value = '09:00';
+  document.getElementById('taskEnd').value = '10:00';
+  document.getElementById('taskOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('taskTitle').focus(), 300);
+}
+
+function saveTaskHandler() {
+  const title = document.getElementById('taskTitle').value.trim();
+  if (!title) { showToast('タイトルを入力してください'); return; }
+  S.taskList.push({
+    id: S.taskNextId++,
+    title,
+    date: taskModalDay,
+    startTime: document.getElementById('taskStart').value || '09:00',
+    endTime:   document.getElementById('taskEnd').value   || '10:00',
+    done: false,
+  });
+  save();
+  document.getElementById('taskOverlay').classList.remove('open');
+  showToast('📋 タスクを追加しました');
+  renderCalendar();
+}
+
+document.getElementById('calAddTask').addEventListener('click', showTaskModal);
+document.getElementById('closeTaskModal').addEventListener('click', () =>
+  document.getElementById('taskOverlay').classList.remove('open'));
+document.getElementById('taskOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('taskOverlay'))
+    document.getElementById('taskOverlay').classList.remove('open');
+});
+document.getElementById('saveTask').addEventListener('click', saveTaskHandler);
+document.getElementById('taskTitle').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveTaskHandler();
+});
 
 // ═══════════════════════════════════════
 // Habit add modal
