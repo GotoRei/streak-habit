@@ -251,6 +251,12 @@ input,button,textarea { font-family: inherit; }
 .w-cell.today-done { background: var(--accent); box-shadow: 0 0 14px rgba(124,111,247,.4); }
 .w-cell.today-done .w-label { color: #fff; }
 .w-cell.today-done .w-dot   { background: rgba(255,255,255,.7); }
+.w-cell.yesterday-empty {
+  background: var(--s2);
+  box-shadow: 0 0 0 2px rgba(245,158,11,.45) inset;
+}
+.w-cell.yesterday-empty .w-label { color: var(--amber); }
+.w-cell.yesterday-empty .w-dot   { background: var(--amber); opacity: .45; }
 @keyframes todayPulse {
   0%,100% { box-shadow: 0 0 0 2px var(--accent) inset; }
   50%      { box-shadow: 0 0 0 2px rgba(124,111,247,.3) inset; }
@@ -1026,23 +1032,38 @@ function renderHabits() {
 
     const grid=document.createElement('div');
     grid.className='week-grid';
+    const yd=localStr(new Date(Date.now()-86400000));
     week.forEach((d,i)=>{
-      const k=localStr(d), isToday=k===td, isFuture=d>now&&!isToday;
+      const k=localStr(d), isToday=k===td, isYesterday=k===yd, isFuture=d>now&&!isToday;
       const done=!!S.records[k]?.[h.id]?.done;
       const cell=document.createElement('div');
       cell.className='w-cell';
+      cell.dataset.date=k;
       let state;
-      if(isFuture)             state='future';
-      else if(isToday&&done)   state='today-done';
-      else if(isToday)         state='today-empty';
-      else if(done)            state='done';
-      else                     state='missed';
+      if(isFuture)                 state='future';
+      else if(isToday&&done)       state='today-done';
+      else if(isToday)             state='today-empty';
+      else if(done)                state='done';
+      else if(isYesterday)         state='yesterday-empty';
+      else                         state='missed';
       cell.classList.add(state);
-      if(isToday) cell.classList.add('tappable');
+      if(isToday||isYesterday) cell.classList.add('tappable');
       cell.innerHTML=`<div class="w-label">${WDAYS[i]}</div><div class="w-dot"></div>`;
-      if(isToday){
-        if(h.type==='boolean') cell.addEventListener('click',()=>tapHabit(h,cell,card));
-        else cell.addEventListener('click',()=>card.querySelector('.dur-strip').classList.toggle('open'));
+      if(isToday||isYesterday){
+        if(h.type==='boolean'){
+          cell.addEventListener('click',()=>tapHabit(h,cell,card,k));
+        } else {
+          cell.addEventListener('click',()=>{
+            const strip=card.querySelector('.dur-strip');
+            const existVal=S.records[k]?.[h.id]?.value||'';
+            strip.dataset.date=k;
+            strip.querySelector('.dur-label-text').textContent=(isToday?'今日':'昨日')+'の'+h.unit;
+            strip.querySelector('.dur-input').value=existVal;
+            strip.querySelector('.dur-saved').textContent=
+              S.records[k]?.[h.id]?.done&&existVal ? `✓ ${existVal}${h.unit}` : '';
+            strip.classList.toggle('open');
+          });
+        }
       }
       grid.appendChild(cell);
     });
@@ -1052,25 +1073,30 @@ function renderHabits() {
       const tdVal=S.records[td]?.[h.id]?.value;
       const strip=document.createElement('div');
       strip.className='dur-strip';
+      strip.dataset.date=td;
       strip.innerHTML=`
-        <label>今日の${h.unit}</label>
+        <label><span class="dur-label-text">今日の${h.unit}</span></label>
         <input class="dur-input" type="number" inputmode="numeric" min="0" placeholder="0"
           id="dur-${h.id}" value="${tdVal||''}">
         <span class="dur-unit">${h.unit}</span>
         <button class="dur-go" data-id="${h.id}">記録</button>
-        ${S.records[td]?.[h.id]?.done&&tdVal?`<span class="dur-saved">✓ ${tdVal}${h.unit}</span>`:''}
+        <span class="dur-saved">${S.records[td]?.[h.id]?.done&&tdVal?`✓ ${tdVal}${h.unit}`:''}</span>
       `;
       strip.querySelector('.dur-go').addEventListener('click',()=>{
-        const val=parseFloat(document.getElementById(`dur-${h.id}`).value);
+        const val=parseFloat(strip.querySelector('.dur-input').value);
         if(!val||val<=0){showToast('数値を入力してください');return;}
-        const was=S.records[td]?.[h.id]?.done;
-        if(!S.records[td]) S.records[td]={};
-        S.records[td][h.id]={done:true,value:val};
+        const recDate=strip.dataset.date||td;
+        const isRecToday=recDate===td;
+        const was=S.records[recDate]?.[h.id]?.done;
+        if(!S.records[recDate]) S.records[recDate]={};
+        S.records[recDate][h.id]={done:true,value:val};
         if(!was) addXp(10+Math.min(Math.floor(val/10),20)); else save();
-        const c=grid.querySelector('.tappable');
-        rippleCell(c,'today-done','today-empty');
-        burstAt(c);
-        showToast(`${h.icon} ${val}${h.unit} 記録！`);
+        const targetCell=grid.querySelector(`[data-date="${recDate}"]`);
+        if(targetCell) burstAt(targetCell);
+        const msg=isRecToday
+          ? `${h.icon} ${val}${h.unit} 記録！`
+          : `${h.icon} 昨日の ${val}${h.unit} を記録しました`;
+        showToast(msg);
         renderHabits();
       });
       card.appendChild(strip);
@@ -1083,23 +1109,34 @@ function renderHabits() {
   document.getElementById('sXp').textContent=S.totalXp+'💎';
 }
 
-function tapHabit(habit, cell, card) {
-  const td=today();
-  const wasDone=!!S.records[td]?.[habit.id]?.done;
-  if(!S.records[td]) S.records[td]={};
-  if(wasDone){ S.records[td][habit.id]={done:false}; save(); renderHabits(); return; }
-  S.records[td][habit.id]={done:true};
+function tapHabit(habit, cell, card, date) {
+  const isToday = date === today();
+  const wasDone=!!S.records[date]?.[habit.id]?.done;
+  if(!S.records[date]) S.records[date]={};
+  if(wasDone){
+    S.records[date][habit.id]={done:false};
+    save(); renderHabits(); return;
+  }
+  S.records[date][habit.id]={done:true};
   addXp(10);
-  rippleCell(cell,'today-done','today-empty');
+  if(isToday){
+    rippleCell(cell,'today-done','today-empty');
+  } else {
+    rippleCell(cell,'done','yesterday-empty');
+  }
   burstAt(cell);
-  const streak=getStreak(habit.id);
-  let msg=`${habit.icon} ${habit.name} 完了！ +10XP`;
-  if(streak===3) msg=`🔥 3日連続！`;
-  else if(streak===7) msg=`🏆 1週間連続！`;
-  else if(streak===14) msg=`💎 2週間連続！`;
-  else if(streak===30) msg=`🌟 30日連続！`;
-  else if(streak>0&&streak%10===0) msg=`🎉 ${streak}日連続達成！`;
-  showToast(msg);
+  if(!isToday){
+    showToast(`${habit.icon} 昨日の ${habit.name} を記録しました`);
+  } else {
+    const streak=getStreak(habit.id);
+    let msg=`${habit.icon} ${habit.name} 完了！ +10XP`;
+    if(streak===3) msg=`🔥 3日連続！`;
+    else if(streak===7) msg=`🏆 1週間連続！`;
+    else if(streak===14) msg=`💎 2週間連続！`;
+    else if(streak===30) msg=`🌟 30日連続！`;
+    else if(streak>0&&streak%10===0) msg=`🎉 ${streak}日連続達成！`;
+    showToast(msg);
+  }
   renderHabits();
 }
 
