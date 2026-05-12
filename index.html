@@ -927,6 +927,21 @@ function getWeekDates(offset=0) {
   return Array.from({length:7},(_,i)=>{const x=new Date(mon);x.setDate(mon.getDate()+i);return x;});
 }
 
+// 習慣カード用：今日を含む直近7日間（昨日が必ず含まれる）
+function getHabitWeekDates() {
+  const t = new Date(); t.setHours(0,0,0,0);
+  return Array.from({length:7},(_,i)=>{const d=new Date(t);d.setDate(t.getDate()-(6-i));return d;});
+}
+
+// iOS Safariでdivのclickが不安定なのでtouchendも使う
+function addTapHandler(el, fn) {
+  let moved=false;
+  el.addEventListener('touchstart',()=>{moved=false;},{passive:true});
+  el.addEventListener('touchmove', ()=>{moved=true;}, {passive:true});
+  el.addEventListener('touchend', e=>{if(!moved){e.preventDefault();fn();}});
+  el.addEventListener('click', fn);
+}
+
 // ═══════════════════════════════════════
 // Tab switching
 // ═══════════════════════════════════════
@@ -1001,7 +1016,8 @@ function renderAlert() {
 function renderHabits() {
   const list=document.getElementById('habitList');
   list.innerHTML='';
-  const td=today(), week=getWeekDates(), now=new Date();
+  const td=today(), week=getHabitWeekDates(), now=new Date();
+  const DAY_LABEL=['日','月','火','水','木','金','土'];
   let doneCount=0;
 
   S.habits.forEach(h=>{
@@ -1048,12 +1064,12 @@ function renderHabits() {
       else                         state='missed';
       cell.classList.add(state);
       if(isToday||isYesterday) cell.classList.add('tappable');
-      cell.innerHTML=`<div class="w-label">${WDAYS[i]}</div><div class="w-dot"></div>`;
+      cell.innerHTML=`<div class="w-label">${DAY_LABEL[d.getDay()]}</div><div class="w-dot"></div>`;
       if(isToday||isYesterday){
         if(h.type==='boolean'){
-          cell.addEventListener('click',()=>tapHabit(h,cell,card,k));
+          addTapHandler(cell,()=>tapHabit(h,cell,card,k));
         } else {
-          cell.addEventListener('click',()=>{
+          addTapHandler(cell,()=>{
             const strip=card.querySelector('.dur-strip');
             const existVal=S.records[k]?.[h.id]?.value||'';
             strip.dataset.date=k;
