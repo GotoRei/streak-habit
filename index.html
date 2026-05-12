@@ -1529,10 +1529,10 @@ function renderCalendar() {
 document.getElementById('calPrev').addEventListener('click', () => { calOffset--; renderCalendar(); });
 document.getElementById('calNext').addEventListener('click', () => { calOffset++; renderCalendar(); });
 
-function showTaskModal() {
-  const week = getWeekDates(calOffset);
+function showTaskModal(forceDate) {
+  const week = getWeekDates(forceDate ? 0 : calOffset);
   const td = today();
-  taskModalDay = week.some(d => localStr(d) === td) ? td : localStr(week[0]);
+  taskModalDay = forceDate || (week.some(d => localStr(d) === td) ? td : localStr(week[0]));
 
   const dayRow = document.getElementById('taskDayRow');
   dayRow.innerHTML = '';
