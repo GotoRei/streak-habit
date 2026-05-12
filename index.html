@@ -705,6 +705,42 @@ input,button,textarea { font-family: inherit; }
   pointer-events: none;
 }
 .toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ── Calendar week view ─────────────── */
+.cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.cal-nav-label { font-size:.9rem; font-weight:800; }
+.cal-nav-btn { background:var(--s1); border:1px solid var(--bd); border-radius:10px; color:var(--text); padding:6px 12px; font-size:.8rem; cursor:pointer; min-height:32px; }
+.cal-head-row { display:flex; position:sticky; top:0; z-index:50; background:var(--bg); border-bottom:1px solid var(--bd); padding:6px 8px 8px 52px; }
+.cal-dh { flex:1; text-align:center; }
+.cal-dh-dow { font-size:.6rem; font-weight:800; letter-spacing:.04em; color:var(--muted); }
+.cal-dh-dom { font-size:.88rem; font-weight:900; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:2px auto 0; }
+.cal-dh.is-today .cal-dh-dom { background:var(--accent); color:#fff; }
+.cal-body-wrap { display:flex; padding:0 8px 40px; }
+.cal-time-gutter { width:44px; flex-shrink:0; position:relative; }
+.cal-h-lbl { font-size:.58rem; color:var(--muted); position:absolute; right:5px; transform:translateY(-50%); white-space:nowrap; }
+.cal-days { flex:1; display:grid; grid-template-columns:repeat(7,1fr); position:relative; }
+.cal-day-lane { border-left:1px solid var(--bd); position:relative; overflow:hidden; }
+.cal-day-lane:first-child { border-left:none; }
+.cal-gl { position:absolute; left:0; right:0; pointer-events:none; }
+.cal-gl.h  { border-top:1px solid var(--bd); }
+.cal-gl.hh { border-top:1px dashed rgba(39,39,58,.55); }
+.cal-evt { position:absolute; left:2px; right:2px; border-radius:6px; padding:3px 4px; overflow:hidden; display:flex; flex-direction:column; gap:1px; }
+.cal-evt-top { display:flex; align-items:flex-start; gap:2px; }
+.cal-evt-name { font-size:.68rem; font-weight:700; color:#fff; line-height:1.25; flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.cal-evt-time { font-size:.58rem; color:rgba(255,255,255,.78); }
+.cal-sync-btn { flex-shrink:0; background:rgba(255,255,255,.28); border:none; border-radius:4px; color:#fff; font-size:.56rem; font-weight:800; padding:2px 4px; cursor:pointer; line-height:1.4; white-space:nowrap; letter-spacing:.01em; }
+.cal-sync-btn:active { background:rgba(255,255,255,.5); }
+.cal-now-line { position:absolute; left:-1px; right:0; border-top:2px solid var(--red); z-index:5; pointer-events:none; }
+.cal-now-line::before { content:''; position:absolute; left:-4px; top:-4px; width:7px; height:7px; border-radius:50%; background:var(--red); }
+.cal-empty-hint { text-align:center; color:var(--muted); font-size:.84rem; padding:50px 20px; line-height:1.9; }
+
+/* ── Schedule form in habit modal ───── */
+.sched-days { display:flex; gap:4px; margin-bottom:9px; }
+.sched-day { flex:1; height:34px; border-radius:9px; border:1px solid var(--bd); background:var(--bg); color:var(--muted); font-size:.75rem; font-weight:700; cursor:pointer; transition:all .12s; }
+.sched-day.sel { background:var(--accent); border-color:var(--accent); color:#fff; }
+.sched-time-row { display:flex; align-items:center; gap:8px; }
+.sched-time { flex:1; background:var(--bg); border:1px solid var(--bd); border-radius:9px; color:var(--text); padding:8px 10px; font-size:.88rem; outline:none; min-width:0; }
+.sched-time:focus { border-color:var(--accent); }
 </style>
 </head>
 <body>
@@ -783,32 +819,25 @@ input,button,textarea { font-family: inherit; }
 </div>
 
 <!-- ═══════════════════════════════════
-     TAB 3: 週間プラン
+     TAB 3: 週間カレンダー
 ════════════════════════════════════ -->
 <div class="page" id="page-week">
-<div class="page-inner">
-
-  <div class="page-header">
-    <div class="page-title">📅 週間プラン</div>
+  <div style="padding:16px 16px 0">
+    <div class="page-header" style="margin-bottom:8px">
+      <div class="page-title">📅 週間カレンダー</div>
+    </div>
+    <div class="cal-nav">
+      <button class="cal-nav-btn" id="calPrev">‹ 前週</button>
+      <div class="cal-nav-label" id="calLabel"></div>
+      <button class="cal-nav-btn" id="calNext">次週 ›</button>
+    </div>
   </div>
-
-  <div class="week-nav">
-    <button class="week-nav-btn" id="prevWeek">‹ 前週</button>
-    <div class="week-nav-title" id="weekRangeLabel"></div>
-    <button class="week-nav-btn" id="nextWeek">次週 ›</button>
+  <div class="cal-head-row" id="calHead"></div>
+  <div class="cal-body-wrap" id="calBodyWrap">
+    <div class="cal-time-gutter" id="calTimeGutter"></div>
+    <div class="cal-days" id="calDays"></div>
   </div>
-
-  <div class="day-selector" id="daySelector"></div>
-
-  <div class="plan-day-header">
-    <span id="planDayLabel"></span>
-    <span id="planDayStats" style="font-size:0.76rem;color:var(--muted);font-weight:400"></span>
-  </div>
-
-  <div class="plan-list" id="planList"></div>
-  <button class="plan-add-btn" id="planAddBtn">＋ タスクを追加</button>
-
-</div>
+  <div id="calEmptyHint" class="cal-empty-hint" style="display:none"></div>
 </div>
 
 <!-- Tab bar -->
@@ -846,31 +875,26 @@ input,button,textarea { font-family: inherit; }
       <span class="form-label">単位</span>
       <input class="m-input" id="mUnit" placeholder="例：分、回、ページ" maxlength="8" value="分" style="margin-bottom:0">
     </div>
+    <div class="form-sec">
+      <span class="form-label">スケジュール（任意）</span>
+      <div class="sched-days" id="schedDays">
+        <button class="sched-day" data-day="1">月</button>
+        <button class="sched-day" data-day="2">火</button>
+        <button class="sched-day" data-day="3">水</button>
+        <button class="sched-day" data-day="4">木</button>
+        <button class="sched-day" data-day="5">金</button>
+        <button class="sched-day" data-day="6">土</button>
+        <button class="sched-day" data-day="0">日</button>
+      </div>
+      <div class="sched-time-row">
+        <input type="time" id="schedStart" class="sched-time" value="07:00">
+        <span style="color:var(--muted);font-size:.82rem">〜</span>
+        <input type="time" id="schedEnd" class="sched-time" value="07:30">
+      </div>
+    </div>
     <div class="sheet-footer">
       <button class="btn-cancel" id="closeHabitModal">キャンセル</button>
       <button class="btn-save" id="saveHabit">追加する →</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: プラン追加 -->
-<div class="overlay" id="planOverlay">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-title" id="planModalTitle">タスクを追加</div>
-    <div class="plan-source-tabs">
-      <button class="src-tab sel" id="srcText">✏️ テキストで入力</button>
-      <button class="src-tab" id="srcHabit">⚡ 習慣から選ぶ</button>
-    </div>
-    <div id="planTextSection">
-      <input class="m-input" id="planTaskInput" placeholder="タスク名を入力..." maxlength="50">
-    </div>
-    <div id="planHabitSection" style="display:none">
-      <div class="habit-pick-list" id="habitPickList"></div>
-    </div>
-    <div class="sheet-footer">
-      <button class="btn-cancel" id="closePlanModal">キャンセル</button>
-      <button class="btn-save" id="savePlanTask">追加する →</button>
     </div>
   </div>
 </div>
@@ -954,7 +978,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById(`page-${currentTab}`).classList.add('active');
     if (currentTab === 'memo')   renderMemo();
-    if (currentTab === 'week')   renderWeekTab();
+    if (currentTab === 'week')   renderCalendar();
     if (currentTab === 'habits') renderHabits();
   });
 });
@@ -1256,183 +1280,170 @@ document.querySelectorAll('.filter-chip').forEach(chip => {
 });
 
 // ═══════════════════════════════════════
-// WEEK tab
+// WEEK CALENDAR tab
 // ═══════════════════════════════════════
-let weekOffset = 0;
-let selectedDay = today();
+const CAL_START  = 5;    // 5:00
+const CAL_END    = 23;   // 23:00
+const HOUR_H     = 60;   // px per hour
+const EVT_COLORS = ['#7c6ff7','#20d49a','#f59e0b','#ec4899','#60a5fa','#ff7043','#26c6da','#ab47bc'];
+const GCAL_DAY   = ['SU','MO','TU','WE','TH','FR','SA'];
+let calOffset = 0;
 
-function renderWeekTab() {
-  const week = getWeekDates(weekOffset);
+function buildGCalUrl(habit) {
+  const s = habit.schedule;
+  if (!s?.days?.length || !s.startTime || !s.endTime) return null;
+  const [sh, sm] = s.startTime.split(':').map(Number);
+  const [eh, em] = s.endTime.split(':').map(Number);
+  const now = new Date(), todayDow = now.getDay();
+  let bestDay = s.days[0], bestDelta = 100;
+  s.days.forEach(d => {
+    const delta = (d - todayDow + 7) % 7;
+    if (delta < bestDelta) { bestDay = d; bestDelta = delta; }
+  });
+  const evtDate = new Date(now);
+  evtDate.setDate(now.getDate() + bestDelta);
+  const pad2 = n => String(n).padStart(2,'0');
+  const ds = `${evtDate.getFullYear()}${pad2(evtDate.getMonth()+1)}${pad2(evtDate.getDate())}`;
+  const byday = s.days.map(d => GCAL_DAY[d]).join(',');
+  const p = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `${habit.icon} ${habit.name}`,
+    dates: `${ds}T${pad2(sh)}${pad2(sm)}00/${ds}T${pad2(eh)}${pad2(em)}00`,
+    recur: `RRULE:FREQ=WEEKLY;BYDAY=${byday}`,
+    details: 'Streak 習慣トラッカー',
+  });
+  return `https://calendar.google.com/calendar/render?${p}`;
+}
+
+function renderCalendar() {
+  const week = getWeekDates(calOffset);
   const td = today();
+  const totalPx = (CAL_END - CAL_START) * HOUR_H;
 
-  // Week range label
-  const first = week[0], last = week[6];
-  document.getElementById('weekRangeLabel').textContent =
-    `${first.getMonth()+1}/${first.getDate()} 〜 ${last.getMonth()+1}/${last.getDate()}`;
+  // Nav label
+  document.getElementById('calLabel').textContent =
+    `${week[0].getMonth()+1}/${week[0].getDate()} 〜 ${week[6].getMonth()+1}/${week[6].getDate()}`;
 
-  // Day selector
-  const sel = document.getElementById('daySelector');
-  sel.innerHTML = '';
+  // Day headers
+  const head = document.getElementById('calHead');
+  head.innerHTML = '';
   week.forEach((d, i) => {
-    const k = localStr(d);
-    const isToday = k === td;
-    const tasks = S.plan[k] || [];
-    const doneCnt = tasks.filter(t => t.done).length;
-
-    const chip = document.createElement('div');
-    chip.className = 'day-chip' + (k === selectedDay ? ' active' : '') + (isToday ? ' is-today' : '');
-    chip.innerHTML = `
-      <div class="day-chip-label">${WDAYS[i]}</div>
-      <div class="day-chip-date">${d.getDate()}</div>
-      ${tasks.length > 0 ? `<div class="day-badge">${doneCnt}/${tasks.length}</div>` : ''}
-    `;
-    chip.addEventListener('click', () => {
-      selectedDay = k;
-      renderWeekTab();
-    });
-    sel.appendChild(chip);
+    const el = document.createElement('div');
+    el.className = 'cal-dh' + (localStr(d) === td ? ' is-today' : '');
+    el.innerHTML = `<div class="cal-dh-dow">${WDAYS[i]}</div><div class="cal-dh-dom">${d.getDate()}</div>`;
+    head.appendChild(el);
   });
 
-  // Plan list
-  const tasks = S.plan[selectedDay] || [];
-  const doneCnt = tasks.filter(t => t.done).length;
-  const selDate = new Date(selectedDay + 'T00:00:00');
-  const dayLabel = `${WDAYS[(selDate.getDay()+6)%7]}曜日 ${selDate.getMonth()+1}/${selDate.getDate()}`;
-  document.getElementById('planDayLabel').textContent = dayLabel;
-  document.getElementById('planDayStats').textContent =
-    tasks.length > 0 ? `${doneCnt}/${tasks.length} 完了` : '';
+  const anyScheduled = S.habits.some(h => h.schedule?.days?.length);
+  const hint = document.getElementById('calEmptyHint');
 
-  const list = document.getElementById('planList');
-  list.innerHTML = '';
+  if (!anyScheduled) {
+    hint.style.display = 'block';
+    hint.innerHTML = '📅 習慣にスケジュールを設定すると<br>ここに表示されます<br><br>「＋ 追加」で習慣を作成する際に<br>曜日と時間帯を設定してください';
+    document.getElementById('calTimeGutter').innerHTML = '';
+    document.getElementById('calTimeGutter').style.height = '0';
+    document.getElementById('calDays').innerHTML = '';
+    document.getElementById('calDays').style.height = '0';
+    return;
+  }
+  hint.style.display = 'none';
 
-  if (tasks.length === 0) {
-    list.innerHTML = '<div class="plan-empty">タスクがありません<br>「＋ タスクを追加」で追加しよう</div>';
-  } else {
-    tasks.forEach(task => {
-      const item = document.createElement('div');
-      item.className = 'plan-item' + (task.done ? ' done-plan' : '');
-      const habit = task.habitId ? S.habits.find(h => h.id === task.habitId) : null;
-      item.innerHTML = `
-        <button class="plan-check" data-id="${task.id}">${task.done ? '✓' : ''}</button>
-        ${habit ? `<span class="plan-icon">${habit.icon}</span>` : ''}
-        <span class="plan-text">${escHtml(task.text)}</span>
-        <button class="plan-del" data-id="${task.id}">×</button>
+  // Time gutter
+  const gutter = document.getElementById('calTimeGutter');
+  gutter.innerHTML = '';
+  gutter.style.height = totalPx + 'px';
+  for (let h = CAL_START; h <= CAL_END; h++) {
+    const lbl = document.createElement('div');
+    lbl.className = 'cal-h-lbl';
+    lbl.style.top = ((h - CAL_START) * HOUR_H) + 'px';
+    if (h < CAL_END) lbl.textContent = `${h}:00`;
+    gutter.appendChild(lbl);
+  }
+
+  // Day lanes + grid lines
+  const daysEl = document.getElementById('calDays');
+  daysEl.innerHTML = '';
+  daysEl.style.height = totalPx + 'px';
+  for (let i = 0; i < 7; i++) {
+    const lane = document.createElement('div');
+    lane.className = 'cal-day-lane';
+    lane.style.height = totalPx + 'px';
+    for (let h = CAL_START; h < CAL_END; h++) {
+      const y = (h - CAL_START) * HOUR_H;
+      const hl = document.createElement('div');
+      hl.className = 'cal-gl h'; hl.style.top = y + 'px';
+      const hhl = document.createElement('div');
+      hhl.className = 'cal-gl hh'; hhl.style.top = (y + 30) + 'px';
+      lane.append(hl, hhl);
+    }
+    daysEl.appendChild(lane);
+  }
+
+  // Place habit events
+  S.habits.forEach((h, idx) => {
+    const s = h.schedule;
+    if (!s?.days?.length || !s.startTime || !s.endTime) return;
+    const [sh2, sm2] = s.startTime.split(':').map(Number);
+    const [eh2, em2] = s.endTime.split(':').map(Number);
+    const startMin = sh2 * 60 + sm2;
+    const endMin   = eh2 * 60 + em2;
+    if (endMin <= startMin) return;
+    const topPx = (startMin - CAL_START * 60) / 60 * HOUR_H;
+    const htPx  = Math.max((endMin - startMin) / 60 * HOUR_H, 20);
+    const color = EVT_COLORS[idx % EVT_COLORS.length];
+    const gcalUrl = buildGCalUrl(h);
+
+    week.forEach((d, dayIdx) => {
+      if (!s.days.includes(d.getDay())) return;
+      const lane = daysEl.children[dayIdx];
+      const evt = document.createElement('div');
+      evt.className = 'cal-evt';
+      evt.style.cssText = `top:${topPx}px;height:${htPx}px;background:${color};`;
+      evt.innerHTML = `
+        <div class="cal-evt-top">
+          <div class="cal-evt-name">${h.icon} ${h.name}</div>
+          ${gcalUrl ? '<button class="cal-sync-btn">連携</button>' : ''}
+        </div>
+        ${htPx >= 36 ? `<div class="cal-evt-time">${s.startTime}〜${s.endTime}</div>` : ''}
       `;
-      item.querySelector('.plan-check').addEventListener('click', () => togglePlanTask(task.id, task.habitId));
-      item.querySelector('.plan-del').addEventListener('click', () => {
-        S.plan[selectedDay] = (S.plan[selectedDay]||[]).filter(t => t.id !== task.id);
-        save(); renderWeekTab();
-      });
-      list.appendChild(item);
+      if (gcalUrl) {
+        evt.querySelector('.cal-sync-btn').addEventListener('click', e => {
+          e.stopPropagation();
+          window.open(gcalUrl, '_blank');
+        });
+      }
+      lane.appendChild(evt);
     });
-  }
-}
+  });
 
-function togglePlanTask(taskId, habitId) {
-  const tasks = S.plan[selectedDay] || [];
-  const task = tasks.find(t => t.id === taskId);
-  if (!task) return;
-  task.done = !task.done;
-
-  // 習慣と連動：計画をチェックしたら習慣レコードも更新
-  if (habitId && task.done) {
-    if (!S.records[selectedDay]) S.records[selectedDay] = {};
-    if (!S.records[selectedDay][habitId]?.done) {
-      S.records[selectedDay][habitId] = { done: true, value: null };
-      addXp(10);
-      const h = S.habits.find(x => x.id === habitId);
-      if (h) showToast(`${h.icon} ${h.name} 完了！ +10XP`);
+  // Current time line
+  if (calOffset === 0) {
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    if (nowMin >= CAL_START * 60 && nowMin < CAL_END * 60) {
+      const dow = now.getDay();
+      const colIdx = dow === 0 ? 6 : dow - 1;
+      const nowLine = document.createElement('div');
+      nowLine.className = 'cal-now-line';
+      nowLine.style.top = ((nowMin - CAL_START * 60) / 60 * HOUR_H) + 'px';
+      daysEl.children[colIdx]?.appendChild(nowLine);
     }
-  }
-  save();
-  renderWeekTab();
-  if (currentTab === 'habits') renderHabits();
-}
-
-// Week navigation
-document.getElementById('prevWeek').addEventListener('click', () => { weekOffset--; renderWeekTab(); });
-document.getElementById('nextWeek').addEventListener('click', () => { weekOffset++; renderWeekTab(); });
-
-// Plan add modal
-let planSource = 'text';
-let selectedHabitForPlan = null;
-
-document.getElementById('planAddBtn').addEventListener('click', () => {
-  selectedHabitForPlan = null;
-  document.getElementById('planTaskInput').value = '';
-  document.querySelectorAll('.habit-pick-item').forEach(i => i.classList.remove('sel'));
-  const selDate = new Date(selectedDay + 'T00:00:00');
-  document.getElementById('planModalTitle').textContent =
-    `${WDAYS[(selDate.getDay()+6)%7]}曜日のタスクを追加`;
-  setPlanSource('text');
-  document.getElementById('planOverlay').classList.add('open');
-  setTimeout(() => document.getElementById('planTaskInput').focus(), 300);
-});
-
-function setPlanSource(src) {
-  planSource = src;
-  document.getElementById('srcText').classList.toggle('sel', src === 'text');
-  document.getElementById('srcHabit').classList.toggle('sel', src === 'habit');
-  document.getElementById('planTextSection').style.display = src === 'text' ? '' : 'none';
-  document.getElementById('planHabitSection').style.display = src === 'habit' ? '' : 'none';
-
-  if (src === 'habit') {
-    const pick = document.getElementById('habitPickList');
-    pick.innerHTML = '';
-    if (S.habits.length === 0) {
-      pick.innerHTML = '<div style="color:var(--muted);font-size:.84rem;padding:8px 0">習慣がまだありません。先に習慣タブで追加してください。</div>';
-      return;
-    }
-    S.habits.forEach(h => {
-      const item = document.createElement('div');
-      item.className = 'habit-pick-item';
-      item.dataset.id = h.id;
-      item.innerHTML = `<span class="habit-pick-icon">${h.icon}</span><span class="habit-pick-name">${h.name}</span>`;
-      item.addEventListener('click', () => {
-        document.querySelectorAll('.habit-pick-item').forEach(i => i.classList.remove('sel'));
-        item.classList.add('sel');
-        selectedHabitForPlan = h.id;
-      });
-      pick.appendChild(item);
-    });
+    // Scroll to current time
+    const page = document.getElementById('page-week');
+    const nowMin2 = new Date().getHours() * 60 + new Date().getMinutes();
+    const scrollTo = Math.max((nowMin2 - CAL_START * 60) / 60 * HOUR_H - 80, 0);
+    setTimeout(() => { page.scrollTop = scrollTo; }, 50);
   }
 }
 
-document.getElementById('srcText').addEventListener('click', () => setPlanSource('text'));
-document.getElementById('srcHabit').addEventListener('click', () => setPlanSource('habit'));
-
-document.getElementById('savePlanTask').addEventListener('click', () => {
-  let text = '', habitId = null;
-  if (planSource === 'text') {
-    text = document.getElementById('planTaskInput').value.trim();
-    if (!text) { showToast('タスク名を入力してください'); return; }
-  } else {
-    if (!selectedHabitForPlan) { showToast('習慣を選んでください'); return; }
-    const h = S.habits.find(x => x.id === selectedHabitForPlan);
-    text = h.name; habitId = h.id;
-  }
-  if (!S.plan[selectedDay]) S.plan[selectedDay] = [];
-  S.plan[selectedDay].push({ id: S.planNextId++, text, habitId, done: false });
-  save();
-  document.getElementById('planOverlay').classList.remove('open');
-  showToast('📅 タスクを追加しました');
-  renderWeekTab();
-});
-
-document.getElementById('planTaskInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('savePlanTask').click();
-});
-document.getElementById('closePlanModal').addEventListener('click', () =>
-  document.getElementById('planOverlay').classList.remove('open'));
-document.getElementById('planOverlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('planOverlay'))
-    document.getElementById('planOverlay').classList.remove('open');
-});
+document.getElementById('calPrev').addEventListener('click', () => { calOffset--; renderCalendar(); });
+document.getElementById('calNext').addEventListener('click', () => { calOffset++; renderCalendar(); });
 
 // ═══════════════════════════════════════
 // Habit add modal
 // ═══════════════════════════════════════
 let mIcon = ICONS[0], mType = 'boolean';
+let mScheduleDays = new Set();
 
 function setupHabitModal() {
   PRESETS.forEach(p => {
@@ -1446,8 +1457,18 @@ function setupHabitModal() {
       setMIcon(p.icon);
       setMType(p.type);
       if (p.unit) document.getElementById('mUnit').value = p.unit;
+      mScheduleDays = new Set();
+      document.querySelectorAll('.sched-day').forEach(b => b.classList.remove('sel'));
     });
     document.getElementById('presetGrid').appendChild(chip);
+  });
+
+  document.querySelectorAll('.sched-day').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const day = parseInt(btn.dataset.day);
+      if (mScheduleDays.has(day)) { mScheduleDays.delete(day); btn.classList.remove('sel'); }
+      else { mScheduleDays.add(day); btn.classList.add('sel'); }
+    });
   });
 
   ICONS.forEach(ic => {
@@ -1475,6 +1496,10 @@ function setupHabitModal() {
   document.getElementById('openHabitModal').addEventListener('click', () => {
     document.getElementById('mName').value = '';
     document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('sel'));
+    mScheduleDays = new Set();
+    document.querySelectorAll('.sched-day').forEach(b => b.classList.remove('sel'));
+    document.getElementById('schedStart').value = '07:00';
+    document.getElementById('schedEnd').value = '07:30';
     document.getElementById('habitOverlay').classList.add('open');
     setTimeout(() => document.getElementById('mName').focus(), 300);
   });
@@ -1488,7 +1513,12 @@ function setupHabitModal() {
     const name = document.getElementById('mName').value.trim();
     if (!name) { showToast('名前を入力してください'); return; }
     const unit = mType === 'duration' ? (document.getElementById('mUnit').value.trim() || '分') : null;
-    S.habits.push({ id: S.nextId++, name, icon: mIcon, type: mType, unit });
+    const schedule = mScheduleDays.size > 0 ? {
+      days: [...mScheduleDays],
+      startTime: document.getElementById('schedStart').value || '07:00',
+      endTime:   document.getElementById('schedEnd').value   || '07:30',
+    } : null;
+    S.habits.push({ id: S.nextId++, name, icon: mIcon, type: mType, unit, schedule });
     save();
     document.getElementById('habitOverlay').classList.remove('open');
     showToast(`${mIcon} 「${name}」を追加！`);
