@@ -1364,9 +1364,24 @@ function buildGCalUrl(habit) {
   return `https://calendar.google.com/calendar/render?${p}`;
 }
 
+function buildTaskGCalUrl(task) {
+  const [sh, sm] = task.startTime.split(':').map(Number);
+  const [eh, em] = task.endTime.split(':').map(Number);
+  const d = new Date(task.date + 'T00:00:00');
+  const pad2 = n => String(n).padStart(2,'0');
+  const ds = `${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}`;
+  const p = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: task.title,
+    dates: `${ds}T${pad2(sh)}${pad2(sm)}00/${ds}T${pad2(eh)}${pad2(em)}00`,
+    details: 'Streak タスク',
+  });
+  return `https://calendar.google.com/calendar/render?${p}`;
+}
+
 function renderCalendar() {
   const week = getWeekDates(calOffset);
-  const td = today();
+  const td   = today();
   const totalPx = (CAL_END - CAL_START) * HOUR_H;
 
   // Nav label
@@ -1383,22 +1398,7 @@ function renderCalendar() {
     head.appendChild(el);
   });
 
-  const weekKeys = new Set(week.map(d => localStr(d)));
-  const hasContent = S.habits.some(h => h.schedule?.days?.length)
-    || S.taskList.some(t => weekKeys.has(t.date));
-  const hint = document.getElementById('calEmptyHint');
-
-  if (!hasContent) {
-    hint.style.display = 'block';
-    hint.innerHTML = '📅 タスクを追加するか<br>習慣にスケジュールを設定すると<br>ここに表示されます';
-    document.getElementById('calTimeGutter').innerHTML = '';
-    document.getElementById('calTimeGutter').style.height = '0';
-    document.getElementById('calDays').innerHTML = '';
-    document.getElementById('calDays').style.height = '0';
-    return;
-  }
-  hint.style.display = 'none';
-
+  // ── グリッドを常に構築（空でも） ─────────────────
   // Time gutter
   const gutter = document.getElementById('calTimeGutter');
   gutter.innerHTML = '';
@@ -1411,7 +1411,7 @@ function renderCalendar() {
     gutter.appendChild(lbl);
   }
 
-  // Day lanes + grid lines
+  // Day lanes
   const daysEl = document.getElementById('calDays');
   daysEl.innerHTML = '';
   daysEl.style.height = totalPx + 'px';
@@ -1421,8 +1421,8 @@ function renderCalendar() {
     lane.style.height = totalPx + 'px';
     for (let h = CAL_START; h < CAL_END; h++) {
       const y = (h - CAL_START) * HOUR_H;
-      const hl = document.createElement('div');
-      hl.className = 'cal-gl h'; hl.style.top = y + 'px';
+      const hl  = document.createElement('div');
+      hl.className  = 'cal-gl h';  hl.style.top  = y + 'px';
       const hhl = document.createElement('div');
       hhl.className = 'cal-gl hh'; hhl.style.top = (y + 30) + 'px';
       lane.append(hl, hhl);
@@ -1430,7 +1430,17 @@ function renderCalendar() {
     daysEl.appendChild(lane);
   }
 
-  // Place habit events
+  // ── 空ヒント ──────────────────────────────────────
+  const weekKeys = new Set(week.map(d => localStr(d)));
+  const hasContent = S.habits.some(h => h.schedule?.days?.length)
+    || S.taskList.some(t => weekKeys.has(t.date));
+  const hint = document.getElementById('calEmptyHint');
+  hint.style.display = hasContent ? 'none' : 'block';
+  if (!hasContent) {
+    hint.innerHTML = '📅 「＋ タスクを追加」でこの週にタスクを追加するか<br>習慣タブで習慣にスケジュールを設定すると<br>ここに表示されます';
+  }
+
+  // ── 習慣イベント ──────────────────────────────────
   S.habits.forEach((h, idx) => {
     const s = h.schedule;
     if (!s?.days?.length || !s.startTime || !s.endTime) return;
@@ -1440,34 +1450,33 @@ function renderCalendar() {
     const endMin   = eh2 * 60 + em2;
     if (endMin <= startMin) return;
     const topPx = (startMin - CAL_START * 60) / 60 * HOUR_H;
-    const htPx  = Math.max((endMin - startMin) / 60 * HOUR_H, 20);
+    const htPx  = Math.max((endMin - startMin) / 60 * HOUR_H, 22);
     const color = EVT_COLORS[idx % EVT_COLORS.length];
     const gcalUrl = buildGCalUrl(h);
 
     week.forEach((d, dayIdx) => {
       if (!s.days.includes(d.getDay())) return;
       const lane = daysEl.children[dayIdx];
-      const evt = document.createElement('div');
+      const evt  = document.createElement('div');
       evt.className = 'cal-evt';
       evt.style.cssText = `top:${topPx}px;height:${htPx}px;background:${color};`;
       evt.innerHTML = `
         <div class="cal-evt-top">
           <div class="cal-evt-name">${h.icon} ${h.name}</div>
-          ${gcalUrl ? '<button class="cal-sync-btn">連携</button>' : ''}
+          <button class="cal-sync-btn">連携</button>
         </div>
         ${htPx >= 36 ? `<div class="cal-evt-time">${s.startTime}〜${s.endTime}</div>` : ''}
       `;
-      if (gcalUrl) {
-        evt.querySelector('.cal-sync-btn').addEventListener('click', e => {
-          e.stopPropagation();
-          window.open(gcalUrl, '_blank');
-        });
-      }
+      evt.querySelector('.cal-sync-btn').addEventListener('click', e => {
+        e.stopPropagation();
+        if (gcalUrl) { window.open(gcalUrl, '_blank'); }
+        else { showToast('スケジュールを設定すると連携できます'); }
+      });
       lane.appendChild(evt);
     });
   });
 
-  // Tasks
+  // ── タスクイベント ────────────────────────────────
   S.taskList.forEach((task, idx) => {
     const dayIdx = week.findIndex(d => localStr(d) === task.date);
     if (dayIdx < 0) return;
@@ -1476,9 +1485,10 @@ function renderCalendar() {
     const startMin = sh2 * 60 + sm2;
     const endMin   = eh2 * 60 + em2;
     if (endMin <= startMin) return;
-    const topPx = (startMin - CAL_START * 60) / 60 * HOUR_H;
-    const htPx  = Math.max((endMin - startMin) / 60 * HOUR_H, 20);
+    const topPx  = (startMin - CAL_START * 60) / 60 * HOUR_H;
+    const htPx   = Math.max((endMin - startMin) / 60 * HOUR_H, 22);
     const color  = TASK_COLORS[idx % TASK_COLORS.length];
+    const gcalUrl = buildTaskGCalUrl(task);
     const lane   = daysEl.children[dayIdx];
     const evt    = document.createElement('div');
     evt.className = 'cal-task' + (task.done ? ' t-done' : '');
@@ -1486,43 +1496,44 @@ function renderCalendar() {
     evt.innerHTML = `
       <div class="cal-task-row">
         <div class="cal-task-name">📋 ${escHtml(task.title)}</div>
+        <button class="cal-sync-btn" style="font-size:.52rem;padding:1px 3px">連携</button>
         <button class="cal-task-done" title="完了">${task.done ? '✓' : ''}</button>
         <button class="cal-task-del" title="削除">×</button>
       </div>
-      ${htPx >= 32 ? `<div class="cal-task-time">${task.startTime}〜${task.endTime}</div>` : ''}
+      ${htPx >= 34 ? `<div class="cal-task-time">${task.startTime}〜${task.endTime}</div>` : ''}
     `;
+    evt.querySelector('.cal-sync-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      window.open(gcalUrl, '_blank');
+    });
     evt.querySelector('.cal-task-done').addEventListener('click', e => {
       e.stopPropagation();
-      task.done = !task.done;
-      save(); renderCalendar();
+      const t = S.taskList.find(x => x.id === task.id);
+      if (t) { t.done = !t.done; save(); renderCalendar(); }
     });
     evt.querySelector('.cal-task-del').addEventListener('click', e => {
       e.stopPropagation();
       if (confirm(`「${task.title}」を削除しますか？`)) {
-        S.taskList = S.taskList.filter(t => t.id !== task.id);
+        S.taskList = S.taskList.filter(x => x.id !== task.id);
         save(); renderCalendar();
       }
     });
     lane.appendChild(evt);
   });
 
-  // Current time line
+  // ── 現在時刻ライン ────────────────────────────────
   if (calOffset === 0) {
     const now = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
     if (nowMin >= CAL_START * 60 && nowMin < CAL_END * 60) {
-      const dow = now.getDay();
-      const colIdx = dow === 0 ? 6 : dow - 1;
+      const colIdx = now.getDay() === 0 ? 6 : now.getDay() - 1;
       const nowLine = document.createElement('div');
       nowLine.className = 'cal-now-line';
       nowLine.style.top = ((nowMin - CAL_START * 60) / 60 * HOUR_H) + 'px';
       daysEl.children[colIdx]?.appendChild(nowLine);
     }
-    // Scroll to current time
-    const page = document.getElementById('page-week');
-    const nowMin2 = new Date().getHours() * 60 + new Date().getMinutes();
-    const scrollTo = Math.max((nowMin2 - CAL_START * 60) / 60 * HOUR_H - 80, 0);
-    setTimeout(() => { page.scrollTop = scrollTo; }, 50);
+    const scrollTo = Math.max((now.getHours() * 60 + now.getMinutes() - CAL_START * 60) / 60 * HOUR_H - 80, 0);
+    setTimeout(() => { document.getElementById('page-week').scrollTop = scrollTo; }, 50);
   }
 }
 
