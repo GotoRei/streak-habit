@@ -914,9 +914,9 @@ input,button,textarea { font-family: inherit; }
     <div class="form-sec" style="margin-bottom:0">
       <span class="form-label">時間</span>
       <div class="sched-time-row">
-        <input type="time" id="taskStart" class="sched-time" value="09:00">
+        <input type="time" id="taskStart" class="sched-time" value="09:00" step="300">
         <span style="color:var(--muted);font-size:.82rem">〜</span>
-        <input type="time" id="taskEnd" class="sched-time" value="10:00">
+        <input type="time" id="taskEnd" class="sched-time" value="10:00" step="300">
       </div>
     </div>
     <div class="sheet-footer">
@@ -1463,6 +1463,17 @@ document.getElementById('taskOverlay').addEventListener('click', e => {
 document.getElementById('saveTask').addEventListener('click', saveTaskHandler);
 document.getElementById('taskTitle').addEventListener('keydown', e => {
   if (e.key === 'Enter') saveTaskHandler();
+});
+// 開始時刻変更 → 終了時刻を+1時間に自動設定
+document.getElementById('taskStart').addEventListener('change', () => {
+  const val = document.getElementById('taskStart').value;
+  if (!val) return;
+  const [h, m] = val.split(':').map(Number);
+  const endTotal = h * 60 + m + 60;
+  const eh = Math.floor(endTotal / 60) % 24;
+  const em = endTotal % 60;
+  document.getElementById('taskEnd').value =
+    String(eh).padStart(2,'0') + ':' + String(em).padStart(2,'0');
 });
 
 // ═══════════════════════════════════════
