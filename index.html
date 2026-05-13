@@ -1541,9 +1541,11 @@ document.getElementById('calPrev').addEventListener('click', () => { calOffset--
 document.getElementById('calNext').addEventListener('click', () => { calOffset++; renderCalendar(); });
 
 function showTaskModal(forceDate) {
-  const week = getWeekDates(forceDate ? 0 : calOffset);
+  // forceDate は文字列 (YYYY-MM-DD) のみ受け付ける（イベントオブジェクト混入防止）
+  const fd = (typeof forceDate === 'string') ? forceDate : null;
+  const week = getWeekDates(fd ? 0 : calOffset);
   const td = today();
-  taskModalDay = forceDate || (week.some(d => localStr(d) === td) ? td : localStr(week[0]));
+  taskModalDay = fd || (week.some(d => localStr(d) === td) ? td : localStr(week[0]));
 
   const dayRow = document.getElementById('taskDayRow');
   dayRow.innerHTML = '';
@@ -1584,7 +1586,7 @@ function saveTaskHandler() {
   renderCalendar();
 }
 
-document.getElementById('calAddTask').addEventListener('click', showTaskModal);
+document.getElementById('calAddTask').addEventListener('click', () => showTaskModal());
 document.getElementById('closeTaskModal').addEventListener('click', () =>
   document.getElementById('taskOverlay').classList.remove('open'));
 document.getElementById('taskOverlay').addEventListener('click', e => {
