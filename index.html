@@ -208,9 +208,11 @@ input,button,textarea { font-family: inherit; }
   font-size: 1.2rem; flex-shrink: 0;
 }
 .h-info { flex: 1; min-width: 0; }
-.h-name { font-weight: 700; font-size: 0.92rem; margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.h-name { font-weight: 700; font-size: 0.92rem; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.h-stats { display: flex; align-items: center; gap: 10px; }
 .h-streak { font-size: 0.74rem; font-weight: 700; color: var(--amber); }
 .h-streak.cold { color: var(--muted); }
+.h-total { font-size: 0.74rem; font-weight: 700; color: var(--muted); }
 .del-btn {
   width: 30px; height: 30px; border: none; background: none;
   color: var(--muted); font-size: 1rem; cursor: pointer;
@@ -1020,6 +1022,9 @@ function getStreak(hid) {
   for(;;){ if(S.records[localStr(d)]?.[hid]?.done){n++;d.setDate(d.getDate()-1);}else break; }
   return n;
 }
+function getTotalDays(hid) {
+  return Object.values(S.records).filter(r => r?.[hid]?.done).length;
+}
 function yesterdayStreak(hid) {
   let n=0; const d=new Date(); d.setDate(d.getDate()-1);
   for(;;){ if(S.records[localStr(d)]?.[hid]?.done){n++;d.setDate(d.getDate()-1);}else break; }
@@ -1077,6 +1082,7 @@ function renderHabits() {
     const todayDone=!!S.records[td]?.[h.id]?.done;
     if(todayDone) doneCount++;
     const streak=getStreak(h.id);
+    const total=getTotalDays(h.id);
     const danger=!todayDone && yesterdayStreak(h.id)>=2;
 
     const card=document.createElement('div');
@@ -1088,7 +1094,10 @@ function renderHabits() {
       <div class="h-icon">${h.icon}</div>
       <div class="h-info">
         <div class="h-name">${h.name}</div>
-        <div class="h-streak ${streak===0?'cold':''}">🔥 ${streak}日連続</div>
+        <div class="h-stats">
+          <span class="h-streak ${streak===0?'cold':''}">🔥 ${streak}日連続</span>
+          <span class="h-total">📅 通算 ${total}日</span>
+        </div>
       </div>
       <button class="del-btn">×</button>
     `;
