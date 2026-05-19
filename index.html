@@ -747,9 +747,12 @@ input,button,textarea { font-family: inherit; }
 .jnl-item-name { font-size:.85rem; flex:1; }
 .jnl-empty { font-size:.8rem; color:var(--muted); padding:8px 12px; background:var(--s1); border:1px solid var(--bd); border-radius:10px; text-align:center; }
 .jnl-textarea-wrap { position:relative; }
-.jnl-textarea { width:100%; background:var(--s1); border:1px solid var(--bd); border-radius:12px; color:var(--text); font-size:.9rem; line-height:1.65; padding:12px 14px; resize:none; outline:none; min-height:130px; }
+.jnl-textarea { width:100%; background:var(--s1); border:1px solid var(--bd); border-radius:12px; color:var(--text); font-size:.9rem; line-height:1.65; padding:12px 14px; resize:none; outline:none; min-height:80px; }
 .jnl-textarea:focus { border-color:var(--accent); }
 .jnl-textarea::placeholder { color:var(--muted); }
+.jnl-tpl-block { margin-bottom:10px; }
+.jnl-tpl-label { font-size:.76rem; font-weight:800; color:var(--text); margin-bottom:5px; opacity:.75; }
+.jnl-tpl-ta { min-height:72px; border-radius:10px; font-size:.88rem; }
 .jnl-save-btn { width:100%; background:var(--accent); border:none; border-radius:12px; color:#fff; font-size:.9rem; font-weight:800; padding:13px; cursor:pointer; margin-top:10px; transition:opacity .12s; }
 .jnl-save-btn:active { opacity:.75; }
 .jnl-saved-badge { display:inline-block; font-size:.7rem; color:var(--green); font-weight:700; margin-left:8px; opacity:0; transition:opacity .3s; }
@@ -1752,25 +1755,49 @@ function renderJournal() {
 
   body.appendChild(makeSection('🗓️ 明日の予定', '', tmItems, '明日のタスク・習慣スケジュールを追加すると表示されます'));
 
-  // ── ④ 振り返り ────────────────────────────────────
+  // ── ④ 振り返りテンプレート ───────────────────────────
+  const j = S.journals[key] || {};
+  const TEMPLATE = [
+    { id: 'jnlDid',       label: '✅ できたこと',       placeholder: '今日実際にできたことを書こう' },
+    { id: 'jnlDidnt',     label: '❌ できなかったこと', placeholder: '今日できなかったことを書こう' },
+    { id: 'jnlWhyDid',    label: '💡 なぜできたか',     placeholder: 'うまくいった理由・環境・きっかけは？' },
+    { id: 'jnlWhyDidnt',  label: '🤔 なぜできなかったか', placeholder: 'できなかった原因・障害は何だった？' },
+    { id: 'jnlTomorrow',  label: '🚀 明日から行うこと', placeholder: '具体的に何を・いつ・どうやってやるか' },
+  ];
+
   const sec4 = document.createElement('div');
   sec4.className = 'jnl-section';
-  sec4.innerHTML = `
-    <div class="jnl-section-title">💭 振り返り</div>
-    <div class="jnl-textarea-wrap">
-      <textarea class="jnl-textarea" id="jnlReflection"
-        placeholder="・なぜできた？できなかった？&#10;・次に活かすことは？&#10;・気づいたこと、感じたことは？"
-      >${escHtml(S.journals[key]?.reflection || '')}</textarea>
-    </div>
-    <button class="jnl-save-btn" id="jnlSaveBtn">
-      保存する <span class="jnl-saved-badge" id="jnlSavedBadge">✓ 保存済み</span>
-    </button>
-  `;
+
+  const ttl4 = document.createElement('div');
+  ttl4.className = 'jnl-section-title';
+  ttl4.textContent = '💭 振り返り';
+  sec4.appendChild(ttl4);
+
+  TEMPLATE.forEach(tpl => {
+    const block = document.createElement('div');
+    block.className = 'jnl-tpl-block';
+    block.innerHTML = `
+      <div class="jnl-tpl-label">${tpl.label}</div>
+      <textarea class="jnl-textarea jnl-tpl-ta" id="${tpl.id}"
+        placeholder="${tpl.placeholder}"
+        rows="3"
+      >${escHtml(j[tpl.id] || '')}</textarea>
+    `;
+    sec4.appendChild(block);
+  });
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'jnl-save-btn';
+  saveBtn.id = 'jnlSaveBtn';
+  saveBtn.innerHTML = '保存する <span class="jnl-saved-badge" id="jnlSavedBadge">✓ 保存済み</span>';
+  sec4.appendChild(saveBtn);
   body.appendChild(sec4);
 
   document.getElementById('jnlSaveBtn').addEventListener('click', () => {
     if (!S.journals[key]) S.journals[key] = {};
-    S.journals[key].reflection = document.getElementById('jnlReflection').value;
+    TEMPLATE.forEach(tpl => {
+      S.journals[key][tpl.id] = document.getElementById(tpl.id).value;
+    });
     S.journals[key].savedAt = new Date().toISOString();
     save();
     const badge = document.getElementById('jnlSavedBadge');
@@ -1780,7 +1807,7 @@ function renderJournal() {
 
   // ── ⑤ 過去の記録 ─────────────────────────────────
   const pastKeys = Object.keys(S.journals)
-    .filter(k => k < key && S.journals[k]?.reflection?.trim())
+    .filter(k => k < key && TEMPLATE.some(tpl => S.journals[k]?.[tpl.id]?.trim()))
     .sort((a,b) => b.localeCompare(a))
     .slice(0, 5);
 
@@ -1792,15 +1819,15 @@ function renderJournal() {
     list.className = 'jnl-past-list';
     pastKeys.forEach(k => {
       const pd = new Date(k + 'T00:00:00');
+      const preview = TEMPLATE.map(tpl => S.journals[k]?.[tpl.id]).find(v => v?.trim()) || '';
       const card = document.createElement('div');
       card.className = 'jnl-past-card';
       card.innerHTML = `
         <div class="jnl-past-card-date">${pd.getMonth()+1}/${pd.getDate()}（${WD[pd.getDay()]}）</div>
-        <div class="jnl-past-card-preview">${escHtml(S.journals[k].reflection)}</div>
+        <div class="jnl-past-card-preview">${escHtml(preview)}</div>
       `;
       card.addEventListener('click', () => {
-        const diff = Math.round((pd - jnlDate(0)) / 86400000);
-        jnlOffset = diff;
+        jnlOffset = Math.round((pd - jnlDate(0)) / 86400000);
         renderJournal();
       });
       list.appendChild(card);
