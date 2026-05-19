@@ -734,6 +734,31 @@ input,button,textarea { font-family: inherit; }
 .week-task-del { background:none; border:none; color:var(--muted); font-size:.95rem; cursor:pointer; padding:0 2px; flex-shrink:0; line-height:1; }
 .week-day-empty { padding:10px 12px; font-size:.78rem; color:var(--muted); border-top:1px solid var(--bd); }
 
+/* ── Journal tab ────────────────────── */
+.jnl-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.jnl-nav-btn { background:var(--s1); border:1px solid var(--bd); border-radius:10px; color:var(--text); padding:6px 12px; font-size:.8rem; cursor:pointer; min-height:32px; }
+.jnl-date-label { font-size:.95rem; font-weight:900; }
+.jnl-section { margin-bottom:14px; }
+.jnl-section-title { font-size:.7rem; font-weight:900; letter-spacing:.07em; color:var(--muted); text-transform:uppercase; margin-bottom:7px; display:flex; align-items:center; gap:5px; }
+.jnl-items { display:flex; flex-direction:column; gap:4px; }
+.jnl-item { display:flex; align-items:center; gap:8px; background:var(--s1); border:1px solid var(--bd); border-radius:10px; padding:8px 12px; }
+.jnl-item-time { font-size:.7rem; font-weight:700; color:var(--accent); white-space:nowrap; min-width:70px; }
+.jnl-item-time.green { color:var(--green); }
+.jnl-item-name { font-size:.85rem; flex:1; }
+.jnl-empty { font-size:.8rem; color:var(--muted); padding:8px 12px; background:var(--s1); border:1px solid var(--bd); border-radius:10px; text-align:center; }
+.jnl-textarea-wrap { position:relative; }
+.jnl-textarea { width:100%; background:var(--s1); border:1px solid var(--bd); border-radius:12px; color:var(--text); font-size:.9rem; line-height:1.65; padding:12px 14px; resize:none; outline:none; min-height:130px; }
+.jnl-textarea:focus { border-color:var(--accent); }
+.jnl-textarea::placeholder { color:var(--muted); }
+.jnl-save-btn { width:100%; background:var(--accent); border:none; border-radius:12px; color:#fff; font-size:.9rem; font-weight:800; padding:13px; cursor:pointer; margin-top:10px; transition:opacity .12s; }
+.jnl-save-btn:active { opacity:.75; }
+.jnl-saved-badge { display:inline-block; font-size:.7rem; color:var(--green); font-weight:700; margin-left:8px; opacity:0; transition:opacity .3s; }
+.jnl-saved-badge.show { opacity:1; }
+.jnl-past-list { display:flex; flex-direction:column; gap:8px; margin-top:6px; }
+.jnl-past-card { background:var(--s1); border:1px solid var(--bd); border-radius:12px; padding:12px 14px; cursor:pointer; }
+.jnl-past-card-date { font-size:.72rem; font-weight:800; color:var(--muted); margin-bottom:4px; }
+.jnl-past-card-preview { font-size:.83rem; color:var(--text); opacity:.75; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
 /* ── Task modal day chips ────────────── */
 .task-day-row { display:flex; gap:4px; margin-bottom:4px; }
 .task-day-chip { flex:1; background:var(--bg); border:1px solid var(--bd); border-radius:9px; color:var(--muted); font-size:.7rem; font-weight:700; padding:5px 2px; cursor:pointer; text-align:center; }
@@ -841,11 +866,29 @@ input,button,textarea { font-family: inherit; }
   <div id="weekDayList" style="padding:8px 16px 120px"></div>
 </div>
 
+<!-- ═══════════════════════════════════
+     TAB 4: ジャーナル
+════════════════════════════════════ -->
+<div class="page" id="page-journal">
+  <div style="padding:16px 16px 0">
+    <div class="page-header" style="margin-bottom:12px">
+      <div class="page-title">📔 ジャーナル</div>
+    </div>
+    <div class="jnl-nav">
+      <button class="jnl-nav-btn" id="jnlPrev">‹ 前日</button>
+      <div class="jnl-date-label" id="jnlDateLabel"></div>
+      <button class="jnl-nav-btn" id="jnlNext">翌日 ›</button>
+    </div>
+  </div>
+  <div id="jnlBody" style="padding:0 16px 120px"></div>
+</div>
+
 <!-- Tab bar -->
 <nav class="tab-bar">
   <button class="tab-btn active" data-tab="habits">⚡<span>習慣</span></button>
-  <button class="tab-btn" data-tab="memo">📝<span>メモ</span></button>
   <button class="tab-btn" data-tab="week">📅<span>週間</span></button>
+  <button class="tab-btn" data-tab="journal">📔<span>日記</span></button>
+  <button class="tab-btn" data-tab="memo">📝<span>メモ</span></button>
 </nav>
 
 <!-- Modal: 習慣追加 -->
@@ -961,6 +1004,7 @@ if (!S.noteNextId) S.noteNextId = 1;
 if (!S.planNextId) S.planNextId = 1;
 if (!S.taskList)   S.taskList = [];
 if (!S.taskNextId) S.taskNextId = 1;
+if (!S.journals)   S.journals = {};
 
 function save() { localStorage.setItem('streakApp3', JSON.stringify(S)); syncSW(); }
 
@@ -1008,9 +1052,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`page-${currentTab}`).classList.add('active');
-    if (currentTab === 'memo')   renderMemo();
-    if (currentTab === 'week')   renderCalendar();
-    if (currentTab === 'habits') renderHabits();
+    if (currentTab === 'memo')    renderMemo();
+    if (currentTab === 'week')    renderCalendar();
+    if (currentTab === 'habits')  renderHabits();
+    if (currentTab === 'journal') renderJournal();
   });
 });
 
@@ -1642,6 +1687,162 @@ function renderDateChips() {
   document.getElementById('dateChip').textContent=label;
   document.getElementById('dateChip2').textContent=label;
 }
+
+// ═══════════════════════════════════════
+// JOURNAL tab
+// ═══════════════════════════════════════
+let jnlOffset = 0; // 0=今日, -1=昨日, +1=明日
+
+function jnlDate(offset) {
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate() + offset);
+  return d;
+}
+
+function renderJournal() {
+  const WD = ['日','月','火','水','木','金','土'];
+  const d   = jnlDate(jnlOffset);
+  const key = localStr(d);
+  const tomorrow = jnlDate(jnlOffset + 1);
+  const tmKey = localStr(tomorrow);
+  const isToday = jnlOffset === 0;
+
+  // ナビラベル
+  document.getElementById('jnlDateLabel').textContent =
+    `${d.getMonth()+1}/${d.getDate()}（${WD[d.getDay()]}）${isToday ? ' 今日' : ''}`;
+  document.getElementById('jnlNext').disabled = jnlOffset >= 0;
+  document.getElementById('jnlNext').style.opacity = jnlOffset >= 0 ? '.35' : '1';
+
+  const body = document.getElementById('jnlBody');
+  body.innerHTML = '';
+
+  // ── ① 今日できたこと ──────────────────────────────
+  const doneTasks   = S.taskList.filter(t => t.date === key && t.done);
+  const doneHabits  = S.habits.filter(h => S.records[key]?.[h.id]?.done);
+
+  body.appendChild(makeSection('✅ できたこと', 'green', [
+    ...doneHabits.map(h => ({ time: h.schedule?.startTime || '', name: `${h.icon} ${h.name}`, green: true })),
+    ...doneTasks.map(t  => ({ time: t.startTime, name: `📋 ${t.title}`, green: false })),
+  ]));
+
+  // ── ② 今日できなかったこと ──────────────────────────
+  const undoneTasks  = S.taskList.filter(t => t.date === key && !t.done);
+  const undoneHabits = S.habits.filter(h =>
+    !S.records[key]?.[h.id]?.done &&
+    (h.schedule?.days?.includes(d.getDay()) || key === today())
+  ).filter(h => !doneHabits.includes(h));
+
+  body.appendChild(makeSection('❌ できなかったこと', 'red', [
+    ...undoneHabits.map(h => ({ time: h.schedule?.startTime || '', name: `${h.icon} ${h.name}`, green: false })),
+    ...undoneTasks.map(t  => ({ time: t.startTime, name: `📋 ${t.title}`, green: false })),
+  ]));
+
+  // ── ③ 明日の予定 ─────────────────────────────────
+  const tmTasks  = S.taskList.filter(t => t.date === tmKey)
+    .sort((a,b) => a.startTime.localeCompare(b.startTime));
+  const tmHabits = S.habits.filter(h =>
+    h.schedule?.days?.includes(tomorrow.getDay()) && h.schedule.startTime
+  ).sort((a,b) => a.schedule.startTime.localeCompare(b.schedule.startTime));
+
+  const tmItems = [
+    ...tmHabits.map(h => ({ time: `${h.schedule.startTime}〜${h.schedule.endTime}`, name: `${h.icon} ${h.name}`, green: true })),
+    ...tmTasks.map(t  => ({ time: `${t.startTime}〜${t.endTime}`, name: `📋 ${t.title}`, green: false })),
+  ].sort((a,b) => a.time.localeCompare(b.time));
+
+  body.appendChild(makeSection('🗓️ 明日の予定', '', tmItems, '明日のタスク・習慣スケジュールを追加すると表示されます'));
+
+  // ── ④ 振り返り ────────────────────────────────────
+  const sec4 = document.createElement('div');
+  sec4.className = 'jnl-section';
+  sec4.innerHTML = `
+    <div class="jnl-section-title">💭 振り返り</div>
+    <div class="jnl-textarea-wrap">
+      <textarea class="jnl-textarea" id="jnlReflection"
+        placeholder="・なぜできた？できなかった？&#10;・次に活かすことは？&#10;・気づいたこと、感じたことは？"
+      >${escHtml(S.journals[key]?.reflection || '')}</textarea>
+    </div>
+    <button class="jnl-save-btn" id="jnlSaveBtn">
+      保存する <span class="jnl-saved-badge" id="jnlSavedBadge">✓ 保存済み</span>
+    </button>
+  `;
+  body.appendChild(sec4);
+
+  document.getElementById('jnlSaveBtn').addEventListener('click', () => {
+    if (!S.journals[key]) S.journals[key] = {};
+    S.journals[key].reflection = document.getElementById('jnlReflection').value;
+    S.journals[key].savedAt = new Date().toISOString();
+    save();
+    const badge = document.getElementById('jnlSavedBadge');
+    badge.classList.add('show');
+    setTimeout(() => badge.classList.remove('show'), 2000);
+  });
+
+  // ── ⑤ 過去の記録 ─────────────────────────────────
+  const pastKeys = Object.keys(S.journals)
+    .filter(k => k < key && S.journals[k]?.reflection?.trim())
+    .sort((a,b) => b.localeCompare(a))
+    .slice(0, 5);
+
+  if (pastKeys.length > 0) {
+    const sec5 = document.createElement('div');
+    sec5.className = 'jnl-section';
+    sec5.innerHTML = `<div class="jnl-section-title">📜 過去の振り返り</div>`;
+    const list = document.createElement('div');
+    list.className = 'jnl-past-list';
+    pastKeys.forEach(k => {
+      const pd = new Date(k + 'T00:00:00');
+      const card = document.createElement('div');
+      card.className = 'jnl-past-card';
+      card.innerHTML = `
+        <div class="jnl-past-card-date">${pd.getMonth()+1}/${pd.getDate()}（${WD[pd.getDay()]}）</div>
+        <div class="jnl-past-card-preview">${escHtml(S.journals[k].reflection)}</div>
+      `;
+      card.addEventListener('click', () => {
+        const diff = Math.round((pd - jnlDate(0)) / 86400000);
+        jnlOffset = diff;
+        renderJournal();
+      });
+      list.appendChild(card);
+    });
+    sec5.appendChild(list);
+    body.appendChild(sec5);
+  }
+}
+
+function makeSection(title, colorHint, items, emptyMsg) {
+  const sec = document.createElement('div');
+  sec.className = 'jnl-section';
+  const ttl = document.createElement('div');
+  ttl.className = 'jnl-section-title';
+  ttl.textContent = title;
+  sec.appendChild(ttl);
+
+  if (items.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'jnl-empty';
+    empty.textContent = emptyMsg || 'なし';
+    sec.appendChild(empty);
+    return sec;
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'jnl-items';
+  items.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'jnl-item';
+    row.innerHTML = `
+      ${item.time ? `<div class="jnl-item-time${item.green?' green':''}">${item.time}</div>` : ''}
+      <div class="jnl-item-name">${escHtml(item.name)}</div>
+    `;
+    wrap.appendChild(row);
+  });
+  sec.appendChild(wrap);
+  return sec;
+}
+
+document.getElementById('jnlPrev').addEventListener('click', () => { jnlOffset--; renderJournal(); });
+document.getElementById('jnlNext').addEventListener('click', () => { if(jnlOffset<0){jnlOffset++;renderJournal();} });
 
 renderDateChips();
 setupHabitModal();
