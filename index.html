@@ -732,6 +732,8 @@ input,button,textarea { font-family: inherit; }
 .week-task-check { width:22px; height:22px; border-radius:50%; border:1.5px solid var(--bd); background:none; cursor:pointer; font-size:.65rem; color:var(--green); flex-shrink:0; }
 .week-item.t-done .week-task-check { background:var(--green); border-color:var(--green); color:#fff; }
 .week-task-del { background:none; border:none; color:var(--muted); font-size:.95rem; cursor:pointer; padding:0 2px; flex-shrink:0; line-height:1; }
+.week-gcal-btn { background:none; border:none; font-size:.95rem; cursor:pointer; padding:0 1px; flex-shrink:0; line-height:1; opacity:.6; }
+.week-gcal-btn:active { opacity:1; }
 .week-day-empty { padding:10px 12px; font-size:.78rem; color:var(--muted); border-top:1px solid var(--bd); }
 
 /* ── Journal tab ────────────────────── */
@@ -1371,6 +1373,42 @@ document.querySelectorAll('.filter-chip').forEach(chip => {
 let calOffset = 0;
 let taskModalDay = today();
 
+const GCAL_DAY = ['SU','MO','TU','WE','TH','FR','SA'];
+
+function fmtGCalDate(dateStr, timeStr) {
+  // dateStr: 'YYYY-MM-DD', timeStr: 'HH:MM' → 'YYYYMMDDTHHMMSS'
+  return dateStr.replace(/-/g,'') + 'T' + timeStr.replace(':','') + '00';
+}
+
+function buildTaskGCalUrl(task) {
+  const p = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: task.title,
+    dates: fmtGCalDate(task.date, task.startTime) + '/' + fmtGCalDate(task.date, task.endTime),
+    details: 'Streak タスク',
+    crm: 'POPUP',
+    cip: '120',
+  });
+  return 'https://calendar.google.com/calendar/render?' + p;
+}
+
+function buildHabitGCalUrl(habit, refDate) {
+  // refDate: Date object（その週の対象日）
+  const s = habit.schedule;
+  const dateStr = localStr(refDate);
+  const byday = s.days.map(d => GCAL_DAY[d]).join(',');
+  const p = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: habit.icon + ' ' + habit.name,
+    dates: fmtGCalDate(dateStr, s.startTime) + '/' + fmtGCalDate(dateStr, s.endTime),
+    recur: 'RRULE:FREQ=WEEKLY;BYDAY=' + byday,
+    details: 'Streak 習慣トラッカー',
+    crm: 'POPUP',
+    cip: '120',
+  });
+  return 'https://calendar.google.com/calendar/render?' + p;
+}
+
 function renderCalendar() {
   const week = getWeekDates(calOffset);
   const td   = today();
@@ -1431,20 +1469,30 @@ function renderCalendar() {
         const row = document.createElement('div');
         if (item.kind === 'habit') {
           const h = item.h;
+          const gcalUrl = buildHabitGCalUrl(h, d);
           row.className = 'week-item';
           row.innerHTML = `
             <div class="week-item-time habit-color">${h.schedule.startTime}〜${h.schedule.endTime}</div>
             <div class="week-item-name">${h.icon} ${escHtml(h.name)}</div>
+            <button class="week-gcal-btn" title="Googleカレンダーに追加（2時間前通知）">📅</button>
           `;
+          row.querySelector('.week-gcal-btn').addEventListener('click', () => {
+            window.open(gcalUrl, '_blank');
+          });
         } else {
           const task = item.t;
+          const gcalUrl = buildTaskGCalUrl(task);
           row.className = 'week-item' + (task.done ? ' t-done' : '');
           row.innerHTML = `
             <div class="week-item-time task-color">${task.startTime}〜${task.endTime}</div>
             <div class="week-item-name">📋 ${escHtml(task.title)}</div>
+            <button class="week-gcal-btn" title="Googleカレンダーに追加（2時間前通知）">📅</button>
             <button class="week-task-check">${task.done ? '✓' : ''}</button>
             <button class="week-task-del">×</button>
           `;
+          row.querySelector('.week-gcal-btn').addEventListener('click', () => {
+            window.open(gcalUrl, '_blank');
+          });
           row.querySelector('.week-task-check').addEventListener('click', () => {
             const t = S.taskList.find(x => x.id === task.id);
             if (t) { t.done = !t.done; save(); renderCalendar(); }
